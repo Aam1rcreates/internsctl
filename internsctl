@@ -1,0 +1,173 @@
+#!/bin/bash
+
+# Function to display the command's manual page
+function display_manual {
+    echo "internsctl(1)                              Interns Command Manual                              internsctl(1)"
+    echo ""
+    echo "NAME"
+    echo "       internsctl - Custom Linux command for various operations"
+    echo ""
+    echo "SYNOPSIS"
+    echo "       internsctl [OPTIONS] COMMAND [ARGS...]"
+    echo ""
+    echo "DESCRIPTION"
+    echo "       internsctl is a custom Linux command that provides various functionalities for server"
+    echo "       management and file operations."
+    echo ""
+    echo "OPTIONS"
+    echo "       --help     Show help message and exit"
+    echo "       --version  Show command version and exit"
+    echo ""
+    echo "COMMANDS"
+    echo "       cpu        Get CPU information"
+    echo "       memory     Get memory information"
+    echo "       user       Manage users"
+    echo "       file       Get information about a file"
+    echo ""
+}
+
+# Function to display command version
+function display_version {
+    echo "internsctl v0.1.0"
+}
+
+# Function to display command help
+function display_help {
+    echo "Usage: internsctl [OPTIONS] COMMAND [ARGS...]"
+    echo ""
+    echo "Options:"
+    echo "  --help     Show this message and exit"
+    echo "  --version  Show command version and exit"
+    echo ""
+    echo "Commands:"
+    echo "  cpu        Get CPU information"
+    echo "  memory     Get memory information"
+    echo "  user       Manage users"
+    echo "  file       Get information about a file"
+}
+
+# Function to get CPU information
+function get_cpu_info {
+    lscpu
+}
+
+# Function to get memory information
+function get_memory_info {
+    free
+}
+
+# Function to create a new user
+function create_user {
+    if [ $# -eq 0 ]; then
+        echo "Error: Please provide a username."
+    else
+        sudo useradd -m "$1"
+        echo "User '$1' created successfully."
+    fi
+}
+
+# Function to list users with optional sudo-only filter
+function list_users {
+    if [ "$1" == "--sudo-only" ]; then
+        cut -d: -f1 /etc/passwd | xargs -n 1 id -nG | grep -w 'sudo' | cut -d' ' -f1
+    else
+        cut -d: -f1 /etc/passwd
+    fi
+}
+
+
+
+# Function to get file information with optional options
+function get_file_info {
+    local file="$1"
+
+    if [ -z "$file" ]; then
+        echo "Error: Please provide a file name."
+        return 1
+    fi
+
+    if [ ! -f "$file" ]; then
+        echo "Error: File '$file' not found."
+        return 1
+    fi
+
+    shift
+
+    local size_option=false
+    local permissions_option=false
+    local owner_option=false
+    local last_modified_option=false
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --size | -s)
+                size_option=true
+                ;;
+            --permissions | -p)
+                permissions_option=true
+                ;;
+            --owner | -o)
+                owner_option=true
+                ;;
+            --last-modified | -m)
+                last_modified_option=true
+                ;;
+            *)
+                echo "Error: Invalid option '$1'"
+                return 1
+                ;;
+        esac
+        shift
+    done
+
+    local info="File: $file"
+
+    if $size_option; then
+        echo "$(stat -c '%s' "$file")"
+    elif $permissions_option; then
+        echo "$(stat -c '%A' "$file")"
+    elif $owner_option; then
+        echo "$(stat -c '%U' "$file")"
+    elif $last_modified_option; then
+        echo "$(stat -c '%y' "$file")"
+    else
+        echo -e "$info"
+    fi
+}
+
+
+# Main function to handle the command
+function main {
+    case "$1" in
+        --help)
+            display_help;;
+        --version)
+            display_version;;
+        cpu)
+            get_cpu_info;;
+        memory)
+            get_memory_info;;
+        user)
+            shift
+            if [ "$1" == "create" ]; then
+                shift
+                create_user "$1"
+            elif [ "$1" == "list" ]; then
+                shift
+                list_users "$1"
+            else
+                echo "Error: Invalid subcommand '$1' for 'user'"
+            fi
+            ;;
+       file)
+            shift
+            get_file_info "$1" "${@:2}"
+            ;;
+        *)
+            echo "Error: Invalid command '$1'"
+            display_help;;
+    esac
+}
+
+# Call the main function with command-line arguments
+main "$@"
